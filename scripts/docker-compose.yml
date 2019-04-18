@@ -1,0 +1,80 @@
+# Docker compose file to deploy using docker-compose, or docker swarm
+version: '3.5'
+services:
+  spark-master:
+    build:
+      context: .
+    # WE CAN ADD FOLLOWING PARAMETERS TO THE WORKER:  -i localhost -p 8881 -c 2 -m 512m -d /conf --webui-port 8081
+    command: >
+      bash -c "spark-class org.apache.spark.deploy.master.Master -h spark-master &
+      spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077 -c 2 -m 4g"
+    hostname: spark-master
+    container_name: spark-master
+    environment:
+      MASTER: spark://spark-master:7077
+      SPARK_CONF_DIR: /conf
+      SPARK_PUBLIC_DNS: localhost
+    expose:
+      - 7001
+      - 7002
+      - 7003
+      - 7004
+      - 7005
+      - 7006
+      - 7077
+      - 6066
+    ports:
+      - 8080:8080
+      - 7077:7077
+      # We need the following port 8081 to access the webui of the worker, if we change the port in worker command we have to change here as well.
+      - 8081:8081
+    volumes:
+      - ..:/opt/work
+    restart: always
+    networks:
+      - my-network
+  influxdb:
+    image: influxdb:latest
+    hostname: influxdb
+    container_name: influxdb
+    ports:
+      - 8083:8083
+      - 8086:8086
+      - 8090:8090
+    environment:
+      - INFLUXDB_DATA_ENGINE=tsm1
+      - INFLUXDB_REPORTING_DISABLED=false
+    volumes:
+      # Data persistency
+      # sudo mkdir -p /srv/docker/influxdb/data
+      - /tmp/data/influxdb/data:/var/lib/influxdb
+    networks:
+      - my-network
+  chronograf:
+    image: chronograf:latest
+    hostname: chronograf
+    container_name: chronograf
+    ports:
+      - 8888:8888
+    links:
+      - influxdb
+    volumes:
+      - /tmp/data/chronograf/data:/var/lib/chronograf
+    networks:
+      - my-network
+  telegraf:
+    image: telegraf:latest
+    hostname: telegraf
+    container_name: telegraf
+    environment:
+      HOSTNAME: "telegraf-getting-started"
+    links:
+      - influxdb
+    volumes:
+      - /tmp/data/telegraf/data:/var/lib/telegraf
+    networks:
+      - my-network
+networks:
+  my-network:
+    name: my-network
+    external: false

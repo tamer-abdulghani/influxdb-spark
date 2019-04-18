@@ -1,0 +1,6 @@
+*.class
+*.log
+resources/ais/*
+.idea
+target
+project
